@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vitalis: emergency triage and hospital finder for Telangana</title>
+  <meta name="description" content="Free emergency triage and nearest-hospital finder for Telangana. Check how urgent your symptoms are and find where to go.">
+  <meta name="theme-color" content="#0d1b2a">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230d1b2a'/%3E%3Cpath d='M6 34h14l6-16 10 30 7-18 4 4h11' fill='none' stroke='%2352e6d8' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <a class="skip" href="#triage">Skip to symptom check</a>
+
+  <header class="topbar">
+    <div class="wrap topbar-in">
+      <a class="brand" href="#top" aria-label="Vitalis home">
+        <svg viewBox="0 0 64 64" width="30" height="30" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#14283d"/><path d="M6 34h14l6-16 10 30 7-18 4 4h11" fill="none" stroke="#52e6d8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Vitalis</span>
+      </a>
+      <nav class="nav" aria-label="Sections">
+        <a href="#triage">Symptoms</a>
+        <a href="#hospitals">Hospitals</a>
+        <a href="#firstaid">First aid</a>
+      </nav>
+      <div class="topbar-actions">
+        <a class="call-pill" href="tel:108">Call 108</a>
+        <button class="btn-ghost" id="accountBtn" type="button">Sign in</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="heroTitle">
+      <div class="wrap hero-in">
+        <h1 id="heroTitle">Know how urgent it is, then get to the right hospital.</h1>
+        <p class="hero-sub">Free emergency triage and hospital finder for Telangana. Answer a few questions and get a clear next step.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#triage">Check my symptoms</a>
+          <button class="btn btn-light" id="heroLocate" type="button">Find hospitals near me</button>
+        </div>
+      </div>
+      <div class="monitor" aria-hidden="true">
+        <canvas id="ecg"></canvas>
+      </div>
+      <div class="wrap hero-stats">
+        <p><strong class="mono" id="statHospitals">&ndash;</strong> hospitals listed across <strong class="mono" id="statDistricts">&ndash;</strong> districts</p>
+        <p>Emergency numbers: <strong class="mono">108</strong> ambulance, <strong class="mono">112</strong> any emergency</p>
+      </div>
+    </section>
+
+    <section class="section" id="triage" aria-labelledby="triageTitle">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="triageTitle">What are you feeling?</h2>
+          <p>Pick everything that applies. If someone cannot breathe or is not responding, do not wait: call 108.</p>
+        </div>
+
+        <div class="triage-grid">
+          <form id="triageForm" class="triage-form" novalidate>
+            <fieldset class="age">
+              <legend>Age of the patient</legend>
+              <div class="seg">
+                <input type="radio" name="age" id="ageInfant" value="infant"><label for="ageInfant">Under 1</label>
+                <input type="radio" name="age" id="ageChild" value="child"><label for="ageChild">1 to 12</label>
+                <input type="radio" name="age" id="ageAdult" value="adult" checked><label for="ageAdult">13 to 64</label>
+                <input type="radio" name="age" id="ageSenior" value="senior"><label for="ageSenior">65 and over</label>
+              </div>
+            </fieldset>
+
+            <div id="symptomGroups" class="sym-groups" aria-live="polite">
+              <p class="muted">Loading symptoms&hellip;</p>
+            </div>
+
+            <div class="form-foot">
+              <button class="btn btn-primary" id="triageBtn" type="submit" disabled>Check urgency</button>
+              <button class="btn-link" id="triageClear" type="button" hidden>Clear all</button>
+              <span class="muted" id="triageCount" aria-live="polite">Nothing selected</span>
+            </div>
+          </form>
+
+          <aside class="result" id="result" data-state="idle" aria-live="polite" aria-label="Triage result">
+            <div class="result-idle">
+              <svg class="gauge ghost" viewBox="0 0 300 175" aria-hidden="true"><path d="M30 150A120 120 0 0 1 270 150" fill="none" stroke="currentColor" stroke-width="16" stroke-dasharray="3 7"/></svg>
+              <p>Your result appears here. It takes a few seconds.</p>
+            </div>
+
+            <div class="result-scan" aria-hidden="true">
+              <div class="scanbox"><span class="scanline"></span></div>
+              <p>Checking warning signs&hellip;</p>
+            </div>
+
+            <div class="result-done">
+              <svg class="gauge" id="gauge" viewBox="0 0 300 175" role="img" aria-label="Urgency gauge">
+                <g id="gaugeArcs"></g>
+                <g class="needle" id="needle"><line x1="150" y1="150" x2="150" y2="50"/><circle cx="150" cy="150" r="9"/></g>
+              </svg>
+              <p class="score mono"><span id="scoreNum">0</span><span class="score-max">/100 urgency</span></p>
+              <h3 id="resTitle"></h3>
+              <p class="res-headline" id="resHeadline"></p>
+              <div class="support" id="resSupport" hidden></div>
+              <ol class="res-steps" id="resSteps"></ol>
+              <div class="res-warn" id="resWarn" hidden>
+                <p class="res-label">Warning signs you selected</p>
+                <ul id="resWarnList"></ul>
+              </div>
+              <div class="res-aid" id="resAid" hidden>
+                <p class="res-label">First aid while you wait</p>
+                <div id="resAidList" class="aid-links"></div>
+              </div>
+              <div class="res-actions">
+                <a class="btn btn-danger" id="resCall" href="tel:108" hidden>Call 108 now</a>
+                <button class="btn btn-primary" id="resFind" type="button">Find the nearest hospital</button>
+              </div>
+              <p class="disclaimer" id="resDisclaimer"></p>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-alt" id="hospitals" aria-labelledby="hospTitle">
+      <div class="wrap">
+        <div class="section-head hosp-head">
+          <div>
+            <h2 id="hospTitle">Hospitals near you</h2>
+            <p>Share your location to sort by distance, or search by name or district.</p>
+          </div>
+          <div class="radar" id="radar" aria-hidden="true">
+            <span class="ring r1"></span><span class="ring r2"></span><span class="ring r3"></span><span class="dot"></span>
+          </div>
+        </div>
+
+        <div class="toolbar">
+          <button class="btn btn-primary" id="locateBtn" type="button">Use my location</button>
+          <label class="field grow">
+            <span class="sr">Search hospitals</span>
+            <input type="search" id="hospQ" placeholder="Search by hospital name or area" autocomplete="off" maxlength="80">
+          </label>
+          <label class="field">
+            <span class="sr">District</span>
+            <select id="hospDistrict"><option value="">All districts</option></select>
+          </label>
+        </div>
+
+        <p class="status" id="hospStatus" aria-live="polite"></p>
+        <ul class="hosp-list" id="hospList"></ul>
+        <div class="more"><button class="btn btn-outline" id="hospMore" type="button" hidden>Show more hospitals</button></div>
+      </div>
+    </section>
+
+    <section class="section" id="firstaid" aria-labelledby="aidTitle">
+      <div class="wrap narrow">
+        <div class="section-head">
+          <h2 id="aidTitle">First aid for the first few minutes</h2>
+          <p>Read these before you need them. Always call 108 for serious injuries.</p>
+        </div>
+        <div id="aidList" class="aid-list"><p class="muted">Loading&hellip;</p></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <p>Vitalis gives general guidance and is not a substitute for a doctor. In an emergency call <strong>108</strong> or <strong>112</strong>. For emotional distress, Tele-MANAS is available on <strong>14416</strong>.</p>
+      <p class="muted-on-dark">Built for Telangana. Hospital details can be out of date: call ahead when you can.</p>
+    </div>
+  </footer>
+
+  <a class="fab-call" href="tel:108" aria-label="Call 108 ambulance">Call 108</a>
+
+  <dialog id="auth" class="auth" aria-labelledby="authTitle">
+    <button class="auth-close" id="authClose" type="button" aria-label="Close">&times;</button>
+    <div id="authBody" data-view="signin">
+      <h2 id="authTitle">Sign in</h2>
+      <div id="googleWrap" class="google-wrap" hidden><div id="gbtn"></div><p class="or"><span>or use email</span></p></div>
+
+      <form id="formSignin" class="auth-form" data-for="signin" novalidate>
+        <label>Email<input type="email" name="email" autocomplete="email" required></label>
+        <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+        <button class="btn btn-primary" type="submit">Sign in</button>
+        <p class="auth-links"><button type="button" class="btn-link" data-go="forgot">Forgot password?</button><button type="button" class="btn-link" data-go="signup">Create an account</button></p>
+      </form>
+
+      <form id="formSignup" class="auth-form" data-for="signup" novalidate>
+        <label>Name<input type="text" name="name" autocomplete="name" maxlength="80" required></label>
+        <label>Email<input type="email" name="email" autocomplete="email" required></label>
+        <label>Password<input type="password" name="password" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
+        <button class="btn btn-primary" type="submit">Create account</button>
+        <p class="auth-links"><button type="button" class="btn-link" data-go="signin">I already have an account</button></p>
+      </form>
+
+      <form id="formForgot" class="auth-form" data-for="forgot" novalidate>
+        <p class="muted">Enter your email and we will send a link to choose a new password.</p>
+        <label>Email<input type="email" name="email" autocomplete="email" required></label>
+        <button class="btn btn-primary" type="submit">Send reset link</button>
+        <p class="auth-links"><button type="button" class="btn-link" data-go="signin">Back to sign in</button></p>
+      </form>
+
+      <form id="formReset" class="auth-form" data-for="reset" novalidate>
+        <label>New password<input type="password" name="password" autocomplete="new-password" minlength="8" required><small>At least 8 characters.</small></label>
+        <button class="btn btn-primary" type="submit">Save new password</button>
+      </form>
+
+      <p class="auth-msg" id="authMsg" role="alert" hidden></p>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
